@@ -1,5 +1,5 @@
 
-  #Google Data Analytics Professional Certificate Case Study
+        Google Data Analytics Professional Certificate Case Study
 
 This case study about Bellabeat, Bellabeat is a high-tech manufacturer of health-focused products for women and I should do all data phases 
 

@@ -1,0 +1,232 @@
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+
+daily_activity <- read.csv("dailyActivity_merged.csv")
+sleepday <- read.csv("sleepDay_merged.csv")
+hourly_calories <- read.csv("hourlyCalories_merged.csv")
+hourly_intensities <- read.csv("hourlyIntensities_merged.csv")
+hourly_steps <- read.csv("hourlySteps_merged.csv")
+weight_info <- read.csv("weightLogInfo_merged.csv")
+
+# rename columns and convert data types to be compatible .
+
+(hourly_calories <- rename(hourly_calories, hourly_Calories = Calories )) 
+(hourly_intensities <-
+    rename(hourly_intensities, hourly_TotalIntensity = TotalIntensity, hourly_AverageIntensity = AverageIntensity))
+
+daily_activity$Id <- as.character(daily_activity$Id)
+daily_activity$date <- as.Date(daily_activity$ActivityDate, format = "%m/%d/%Y")
+str(daily_activity)
+head(daily_activity$ActivityDate)
+
+
+sleepday$Id <- as.character(sleepday$Id)
+sleepday$date <- as.Date(sleepday$SleepDay, format = "%m/%d/%Y")
+str(sleepday)
+head(sleepday)
+         
+
+hourly_calories$Id <- as.character(hourly_calories$Id)
+hourly_calories$date <- 
+  as.POSIXct(hourly_calories$ActivityHour, format = "%m/%d/%Y %I:%M:%S %p" )
+str(hourly_calories)
+head(hourly_calories)
+
+
+hourly_intensities$Id <- as.character(hourly_intensities$Id)
+hourly_intensities$date=as.POSIXct(hourly_intensities$ActivityHour,
+                                             format="%m/%d/%Y %I:%M:%S %p")
+str(hourly_intensities)
+head(hourly_intensities)
+
+
+hourly_steps$Id <- as.character(hourly_steps$Id)
+hourly_steps$date = as.POSIXct(hourly_steps$ActivityHour, 
+                                       format = "%m/%d/%Y %I:%M:%S %p")
+str(hourly_steps)
+head(hourly_steps)
+
+
+
+weight_info$Id <- as.character(weight_info$Id)
+weight_info$date <- as.Date(weight_info$Date, format = "%m/%d/%Y" )
+str(weight_info)
+head(weight_info)
+
+
+#check duplicates and any missing values 
+
+sum(duplicated(daily_activity))
+sum(duplicated(sleepday))
+sum(duplicated(hourly_calories))
+sum(duplicated(hourly_intensities))
+sum(duplicated(hourly_intensities))
+sum(duplicated(weight_info))
+
+# there are three duplicates in sleepday let's remove its.
+sleepday <- unique(sleepday)
+str(sleepday)
+
+
+any(is.na(daily_activity))
+any(is.na(hourly_calories))
+any(is.na(sleepday))
+any(is.na(hourly_steps))
+any(is.na(hourly_intensities))
+any(is.na(weight_info))
+sum(is.na(weight_info))
+
+# all missing data in the fat column so let's remove it 
+
+weight_info <- weight_info[, !colnames(weight_info) == "Fat"]
+colnames(weight_info)
+
+#let's summarise data to know where we reached and how to deal with these data.
+
+summary(daily_activity)
+
+# daily_activity dataset have data are not compatible because the mean of veryActiveMinutes column
+# smaller than lightlyActiveMinutes column and that doesn't make sense.  
+
+summary(sleepday)
+summary(hourly_calories)
+summary(hourly_intensities)
+summary(hourly_steps)
+summary(weight_info)
+
+# create New column is name days to add days of week. 
+
+daily_activity <- daily_activity %>% mutate(days = weekdays(date))  
+colnames(daily_activity)
+str(daily_activity)
+
+# create New column to separate hours from date in that new column 
+
+hourly_steps <- hourly_steps %>% mutate(days = weekdays(date)) %>% 
+  mutate(hours = format(date, format = "%H:%M:%M %p")) %>% 
+  mutate(hours = recode(hours, "00:00:00 AM" = "12:00:00 AM"))
+colnames(hourly_steps)
+str(hourly_steps)
+
+hourly_calories <- hourly_calories %>% mutate(days = weekdays(date)) %>% 
+  mutate(hours = format(date, format = "%H:%M:%M %p")) %>% 
+  mutate(hours = recode(hours, "00:00:00 AM" = "12:00:00 AM"))
+colnames(hourly_calories)
+str(hourly_calories)
+
+hourly_intensities <- hourly_intensities %>% mutate(days = weekdays(date)) %>% 
+  mutate(hours = format(date, format = "%H:%M:%M %p")) %>% 
+  mutate(hours = recode(hours, "00:00:00 AM" = "12:00:00 AM"))
+colnames(hourly_intensities)
+str(hourly_intensities)
+
+# Let's classify the values into conventional values.
+
+daily_activity$activity_level <- ifelse(daily_activity$TotalSteps < 5000, "Sedentary",
+                                        ifelse(daily_activity$TotalSteps < 7499, "Low Active",
+                                               ifelse(daily_activity$TotalSteps < 9999, "moderate Active",
+                                                      ifelse(daily_activity$TotalSteps < 12500, "Active", 
+                                                             "Highly Active"))))
+
+
+daily_activity$Calories_burned <- ifelse(daily_activity$Calories < 1900, "very low calories burned",
+                                  ifelse(daily_activity$Calories < 2200, "low calories burned",
+                                         ifelse(daily_activity$Calories < 2500, "moderate calories burned",
+                                                ifelse(daily_activity$Calories < 2900, "high calories burned",
+                                                       "very high calories burned"))))
+
+
+weight_info$Weigh_level <- ifelse(weight_info$WeightKg < 55, "thin",
+                                  ifelse(weight_info$WeightKg < 65, "under weight",
+                                         ifelse(weight_info$WeightKg < 85 , "Normal",
+                                                ifelse(weight_info$WeightKg < 100 , "over weight", "Fat"))))
+
+sleepday$TotalHoursAsleep <- sleepday$TotalMinutesAsleep /60
+sleepday$sleep_duration <- ifelse(sleepday$TotalHoursAsleep < 5 , "very low sleep duration",
+                                  ifelse(sleepday$TotalHoursAsleep < 7, "low sleep duration",
+                                         ifelse(sleepday$TotalHoursAsleep <= 8,"normal sleep duration",
+                                                ifelse(sleepday$TotalHoursAsleep < 10, "Long sleep duration",
+                                                       "very long sleep duration")))) 
+
+
+
+
+# let's merge data to do visualization .
+
+daily_bellabeat_data <- inner_join(sleepday, daily_activity, by=c('Id', 'date'))
+daily_bellabeat_data_weigt <- inner_join(daily_bellabeat_data,weight_info,by=c('Id','date'))
+str(daily_bellabeat_data)
+str(daily_bellabeat_data_weigt)
+
+hourly_bellabeat_data <- inner_join(hourly_steps, hourly_intensities,
+                                    by = c('Id', 'date', 'hours', 'days', 'ActivityHour'))
+hourly_bellabeat_data <- inner_join(hourly_bellabeat_data, hourly_calories,
+                                    by = c('Id', 'date', 'hours', 'days', 'ActivityHour'))
+str(hourly_bellabeat_data)
+
+ggplot(data = daily_bellabeat_data, aes(x= activity_level, fill = activity_level)) +
+  geom_bar() + labs(title = "Count Activity level")
+
+ggplot(data = daily_bellabeat_data, aes(x= Calories_burned, fill = Calories_burned)) +
+  geom_bar() + labs(title = "Count Calories Burned")
+
+
+ggplot(data = weight_info, aes(x= Weigh_level, fill = Weigh_level)) + 
+  geom_bar() + labs(title = "Count Weight Level")
+
+ggplot(data = sleepday, aes(x = sleep_duration, fill = sleep_duration)) + 
+  geom_bar() + labs(title = "Count Sleep duration")
+
+daily_bellabeat_data$days <- factor(daily_bellabeat_data$days, 
+                                    levels = c("Sunday", "Monday", "Tuesday", 
+                                               "Wednesday", "Thursday", "Friday", "Saturday"))
+
+ggplot(data = daily_bellabeat_data, aes(x = days, y = activity_level, fill = activity_level)) +
+  geom_col() +
+  labs(title = "Activity Level through Days")
+
+ggplot(data = daily_bellabeat_data, aes(x = days, y = sleep_duration, fill = sleep_duration)) +
+  geom_col() + 
+  labs(title = "Sleep duration through Days")
+
+daily_bellabeat_data_weigt$Calories_burned <- factor(daily_bellabeat_data_weigt$Calories_burned,
+                                                     levels = c("very low calories burned","low calories burned",
+                                                                "moderate calories burned", "high calories burned",
+                                                                "very high calories burned" ))
+
+
+daily_bellabeat_data_weigt$Weigh_level <- factor(daily_bellabeat_data_weigt$Weigh_level,
+                                                 levels = c("thin", "under weight",
+                                                            "Normal", "over weight", "Fat" ))
+
+ggplot(data = daily_bellabeat_data_weigt, aes(x = Weigh_level, y= Calories_burned, color = Id)) +
+  geom_point() + 
+  labs(title = "weight Level vs Calories burned ")
+ 
+
+hourly_bellabeat_intensity <- hourly_bellabeat_data %>% 
+  group_by(hours) %>% 
+  summarise(hourly_Active_intensity = mean(hourly_TotalIntensity))
+
+hourly_bellabeat_totalSteps <- hourly_bellabeat_data %>%
+  group_by(hours) %>% 
+  summarise(hourly_TotalSteps = mean(StepTotal))
+  
+
+hourly_bellabeat_calories <- hourly_bellabeat_data %>% 
+  group_by(hours) %>% 
+  summarise(hourly_calories_Burned = mean(hourly_Calories)) 
+
+
+ggplot(data = hourly_bellabeat_intensity, aes(x= hours, y= hourly_Active_intensity, fill = hourly_Active_intensity)) + 
+  geom_point(stat = "identity") + theme(axis.text.x = element_text(angle = 90))
+
+
+ggplot(data = hourly_bellabeat_calories, aes(x= hours, y= hourly_calories_Burned, fill = hourly_calories_Burned)) +
+  geom_point(stat = "identity") + theme(axis.text.x = element_text(angle = 90))
+
+
+ggplot(data = hourly_bellabeat_totalSteps, aes(x= hours, y= hourly_TotalSteps, fill = hourly_TotalSteps)) +
+  geom_point(stat = "identity") + theme(axis.text.x = element_text(angle = 90))
+
